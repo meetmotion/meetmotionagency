@@ -40,12 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---------- LENIS SMOOTH SCROLL ----------
     const lenis = new Lenis({
-        duration: 1.4,
-        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        duration: 1,
+        easing: (t) => 1 - Math.pow(1 - t, 3),
         orientation: 'vertical',
         gestureOrientation: 'vertical',
         smoothWheel: true,
-        wheelMultiplier: 1,
+        wheelMultiplier: 0.9,
         smoothTouch: false,
         touchMultiplier: 2,
         infinite: false,
@@ -60,6 +60,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Make lenis accessible globally for any components that need it
     window.lenis = lenis;
 
+    // ---------- BACK TO TOP ----------
+    const backToTop = document.createElement('button');
+    backToTop.className = 'back-to-top';
+    backToTop.type = 'button';
+    backToTop.setAttribute('aria-label', 'Back to top');
+    backToTop.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-7 7 7-7 7 7" /></svg>';
+    document.body.appendChild(backToTop);
+
+    const updateBackToTop = () => {
+        backToTop.classList.toggle('is-visible', window.scrollY > 320);
+    };
+
+    window.addEventListener('scroll', updateBackToTop, { passive: true });
+    updateBackToTop();
+
+    backToTop.addEventListener('click', () => {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (window.lenis) {
+            window.lenis.scrollTo(0, { immediate: prefersReducedMotion });
+        } else {
+            window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+        }
+    });
+
 
     // ---------- NAVBAR SCROLL ----------
     const navbar = document.getElementById('navbar');
@@ -67,9 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const scrollPos = window.scrollY;
         navbar.classList.toggle('scrolled', scrollPos > 60);
 
-        // Condensed logic for Desktop
+        // Keep every desktop page navbar at its compact size.
         if (window.innerWidth > 1024) {
-            navbar.classList.toggle('condensed', scrollPos > 200);
+            navbar.classList.add('condensed');
         } else {
             navbar.classList.remove('condensed');
         }
@@ -315,6 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const staggerGroups = [
         { selector: '.process__grid .process__card', delay: 0.1 },
         { selector: '.services__stack .services__card', delay: 0.15 },
+        { selector: '.home-process__grid .home-process__card', delay: 0.14 },
+        { selector: '.home-team__grid .home-team__card', delay: 0.1 },
         { selector: '.portfolio__grid .portfolio__card', delay: 0.12 },
         { selector: '.results__grid .results__card', delay: 0.1 },
         { selector: '.why-us__features .why-us__feature', delay: 0.12 },
@@ -670,6 +696,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // ---------- SERVICES SPOTLIGHT EFFECT ----------
     const serviceCards = document.querySelectorAll('.services__card');
+    if (serviceCards.length > 1) {
+        let serviceStackFrame = 0;
+
+        const updateServiceStack = () => {
+            serviceStackFrame = 0;
+            serviceCards.forEach((card, index) => {
+                const nextCard = serviceCards[index + 1];
+                if (!nextCard) {
+                    card.style.setProperty('--stack-y', '0px');
+                    card.style.setProperty('--stack-scale', '1');
+                    card.style.setProperty('--stack-opacity', '1');
+                    card.classList.remove('past');
+                    return;
+                }
+
+                const stickyTop = parseFloat(getComputedStyle(nextCard).top);
+                const animationRange = 360;
+                const nextCardTop = nextCard.getBoundingClientRect().top;
+                const rawProgress = Math.max(0, Math.min(1, (stickyTop + animationRange - nextCardTop) / animationRange));
+                const progress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+
+                card.style.setProperty('--stack-y', `${-90 * progress}px`);
+                card.style.setProperty('--stack-scale', `${1 - 0.28 * progress}`);
+                card.style.setProperty('--stack-opacity', `${1 - progress}`);
+                card.classList.toggle('past', progress >= 0.99);
+            });
+        };
+
+        const scheduleServiceStackUpdate = () => {
+            if (!serviceStackFrame) {
+                serviceStackFrame = requestAnimationFrame(updateServiceStack);
+            }
+        };
+
+        window.addEventListener('scroll', scheduleServiceStackUpdate, { passive: true });
+        window.addEventListener('resize', scheduleServiceStackUpdate);
+        updateServiceStack();
+    }
+
     serviceCards.forEach(card => {
         card.addEventListener('mousemove', (e) => {
             const rect = card.getBoundingClientRect();
